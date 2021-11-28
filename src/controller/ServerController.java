@@ -7,7 +7,7 @@ import view.ServerView;
 public class ServerController {
 
     //--------------------------
-    private IView serverView;
+    private ServerView serverView;
     private ServerModel serverModel;
 
     //---------------------------
@@ -29,7 +29,7 @@ public class ServerController {
         serverView.addMessage("Esperando al cliente..");
         serverModel.waitClient();
         serverModel.createData();
-        //serverModel.start();
+        serverModel.start();
     }
 
     public void addMessage(String message) {

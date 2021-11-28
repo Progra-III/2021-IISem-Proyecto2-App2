@@ -1,14 +1,17 @@
 package model;
 
 import controller.ServerController;
+import info.SQLExecutorURL;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class ServerModel {
+public class ServerModel extends Thread {
 
     //--------------------------------
 
@@ -137,25 +140,164 @@ public class ServerModel {
         return "";
     }
 
-    private boolean verifyUser(String user, String password){                //????????????????????????????
+    private boolean verifyUser(String user, String password){
+        SQLExecutorURL sqlExecutorURL = new SQLExecutorURL("1433","BaseProyecto","sa","password");
+        sqlExecutorURL.abreConexion();
+        ResultSet resultSet = sqlExecutorURL.ejecutaSQL("SELECT * FROM CLIENTE");
 
+        try {
+            while (resultSet.next()){
+                if (resultSet.getString("USUARIO").equals(user)&&resultSet.getString("CLAVE").equals(password))
+                {
+                    return true;
+                }
+            }
+            return false;
+        } catch (SQLException throwable) {
+            sendMessage(throwable.getMessage());
+        }
+        return false;
+    }
 
+    public void Transaction(String id, String amount, String type){
+        SQLExecutorURL sqlExecutorURL = new SQLExecutorURL("1433","BaseProyecto","sa","password");
+        sqlExecutorURL.abreConexion();
+
+        String[] query ={"INSERT INTO dbo.TRANSACCIONES (ID_CLIENTE,MONTO_TRANSAC,TIPO_ID) VALUES ('"+id+"','"+amount+"','"+type+"')"};
+        sqlExecutorURL.prepareStatement(query);
+    }
+
+    public String returnId(String user){
+        SQLExecutorURL sqlExecutorURL = new SQLExecutorURL("1433","BaseProyecto","sa","password");
+        sqlExecutorURL.abreConexion();
+        ResultSet rs = sqlExecutorURL.ejecutaSQL("SELECT CLIENTE.CEDULA FROM CLIENTE where CLIENTE.USUARIO = '"+user+"'");
+        try {
+            while (rs.next()){
+                if (rs.getString("CEDULA") != null)
+                {
+                    return (rs.getString("CEDULA"));
+                }
+            }
+        } catch (SQLException throwable) {
+            throwable.printStackTrace();
+        }
+        return "0";
+    }
+
+    public String typeTransaction(){
+        SQLExecutorURL sqlExecutorURL = new SQLExecutorURL("1433","BaseProyecto","sa","password");
+        sqlExecutorURL.abreConexion();
+        ResultSet rs = sqlExecutorURL.ejecutaSQL("SELECT TIPO_TRANSACCIONES.ID FROM TIPO_TRANSACCIONES where TIPO_TRANSACCIONES.TIPO_TRANSACCION = 'RETIRO'");
+        try {
+            while (rs.next()){
+                if (rs.getString("ID") != null)
+                {
+                    return (rs.getString("ID"));
+                }
+            }
+        } catch (SQLException throwable) {
+            throwable.printStackTrace();
+        }
+        return "0";
+    }
+
+    public void UpdateBalance(String amount, String user){
+        SQLExecutorURL sqlExecutorURL = new SQLExecutorURL("1433","BaseProyecto","sa","password");
+        sqlExecutorURL.abreConexion();
+        String[] query ={"UPDATE CLIENTE SET SALDO =? WHERE  CLIENTE.USUARIO = '"+user+"'",amount};
+        sqlExecutorURL.prepareStatement(query);
+    }
+
+    public String returnBalance(String user){
+        SQLExecutorURL sqlExecutorURL = new SQLExecutorURL("1433","BaseProyecto","sa","password");
+        sqlExecutorURL.abreConexion();
+        ResultSet rs = sqlExecutorURL.ejecutaSQL("SELECT CLIENTE.SALDO FROM CLIENTE where CLIENTE.USUARIO = '"+user+"'");
+        try {
+
+            while (rs.next()){
+                if (rs.getString("SALDO") != null)
+                {
+                    return (rs.getString("SALDO"));
+                }
+            }
+        } catch (SQLException throwable) {
+            throwable.printStackTrace();
+        }
+        return "0";
+    }
+
+    public void ChangePassword(String password, String user){
+        SQLExecutorURL sqlExecutorURL = new SQLExecutorURL("1433","BaseProyecto","sa","password");
+        sqlExecutorURL.abreConexion();
+        String[] query2 ={"UPDATE CLIENTE SET CLAVE =? WHERE CLIENTE.USUARIO = '"+user+"'",password};
+        sqlExecutorURL.prepareStatement(query2);
+    }
+
+    public String ReturnPassword(String user){
+        SQLExecutorURL sqlExecutorURL = new SQLExecutorURL("1433","BaseProyecto","sa","password");
+        sqlExecutorURL.abreConexion();
+        ResultSet rs = sqlExecutorURL.ejecutaSQL("SELECT CLIENTE.CLAVE FROM CLIENTE where CLIENTE.USUARIO = '"+user+"'");
+        try {
+            while (rs.next()){
+                if (rs.getString("CLAVE") != null)
+                {
+                    return (rs.getString("CLAVE"));
+                }
+            }
+        } catch (SQLException throwable) {
+            throwable.printStackTrace();
+        }
+        return "0";
 
     }
 
-    public void Transaction(String id, String amount, String type){}
+    //----------------------------------------------------------------------------------------------------------
 
-    public String returnId(String user){}
+    @Override
+    public void run() {
+        while (true) {
+            String message = receiveMessage();
+            String user = receiveUser();
+            String password = receivePassword();
 
-    public String typeTransaction(){}
+            switch (message){
+                case "login":
 
-    public void UpdateBalance(String amount, String user){}
+                    if (verifyUser(user, password)) {
+                        sendMessage("Correcto");
+                        serverController.addMessage("Se ha conectado: " + user);
+                    } else {
+                        sendMessage("Warning: Incorrecto");
+                    }
+                    break;
 
-    public String returnBalance(String user){}
+                case "saldo":
+                    sendMessage(returnBalance(user));
+                    break;
 
-    public void ChangePassword(String password, String user){}
+                case "retiro":
 
-    public String ReturnPassword(String user){}
+                    String amount = receiveAmount();
+                    serverController.addMessage(amount);
+                    UpdateBalance(amount, user);
+                    sendMessage(returnBalance(user));
 
+                    Transaction(returnId(user),amount,typeTransaction());
+                    serverController.addMessage("Retiro completado!");
+                    break;
 
+                case "devuelve clave":
+                    sendMessage(ReturnPassword(user));
+
+                case "cambio clave":
+                    ChangePassword(password, user);
+                    ReturnPassword(user);
+                    serverController.addMessage("Contraseña cambiada!");
+                    break;
+                case "saliendo":
+                    serverController.exit();
+                    break;
+            }
+        }
+    }
 }

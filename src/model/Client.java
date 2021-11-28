@@ -87,4 +87,5 @@ public class Client {
     public int hashCode() {
         return Objects.hash(getId(), getName(), getUser(), getPassword(), getBalance());
     }
+
 }

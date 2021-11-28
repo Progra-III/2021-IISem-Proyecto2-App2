@@ -17,6 +17,7 @@ public class ServerView extends JFrame implements IView {
     public ServerView(){
         setContentPane(windowPanel);
         setTitle("Server Communication");
+        setVisible(true);
         setSize(650,400);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         setResizable(false);
